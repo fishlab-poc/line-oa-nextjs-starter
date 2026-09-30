@@ -1,56 +1,160 @@
 "use client";
 
-import { useLiff } from "@/components/line/LiffProvider";
-import { ConnectLineButton } from "@/components/line/ConnectLineButton";
+import { useEffect, useState } from "react";
+
+const members = {
+  A001: {
+    name: "Test Member 1",
+    fingerprint: "FP-A001",
+    version: "A",
+    text: "今日盤勢維持震盪偏多，短線留意量能變化。",
+  },
+  A002: {
+    name: "Test Member 2",
+    fingerprint: "FP-A002",
+    version: "B",
+    text: "今日盤勢仍以震盪偏多看待，短線觀察量能變化。",
+  },
+  A003: {
+    name: "Test Member 3",
+    fingerprint: "FP-A003",
+    version: "C",
+    text: "盤勢暫維持震盪偏多，短線重點仍在量能變化。",
+  },
+};
+
+type MemberCode = keyof typeof members;
 
 export default function Home() {
-  const { ready, inClient, profile, error } = useLiff();
+  const [memberCode, setMemberCode] = useState<MemberCode>("A001");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const member = params.get("member");
+
+    if (member && member in members) {
+      setMemberCode(member as MemberCode);
+    }
+  }, []);
+
+  const member = members[memberCode];
+
+  const watermarkStyle: React.CSSProperties = {
+    position: "fixed",
+    color: "rgba(0,0,0,0.06)",
+    fontSize: 18,
+    fontWeight: 700,
+    transform: "rotate(-25deg)",
+    pointerEvents: "none",
+    userSelect: "none",
+    zIndex: 1,
+  };
 
   return (
-    <main className="container">
-      <h1 style={{ marginBottom: 4 }}>LINE OA · Next.js Starter</h1>
-      <p className="muted" style={{ marginTop: 0 }}>
-        A from-scratch example of the fundamentals of a LINE Official Account web app — no{" "}
-        <code>@line/bot-sdk</code>, every LINE call is a visible <code>fetch</code>.
-      </p>
+    <main
+      style={{
+        maxWidth: 720,
+        margin: "0 auto",
+        padding: "32px 20px 80px",
+        position: "relative",
+        minHeight: "100vh",
+        background: "#f7f7f7",
+      }}
+    >
+      {/* 浮水印 */}
+      <div style={{ ...watermarkStyle, top: "18%", left: "8%" }}>
+        {memberCode} · {member.fingerprint}
+      </div>
 
-      <section className="card" style={{ marginTop: 24 }}>
-        <h2 style={{ marginTop: 0, fontSize: 18 }}>LIFF session</h2>
-        {!ready ? (
-          <p className="muted">Initializing… (in a normal browser with no LIFF id configured this stays idle — that's expected.)</p>
-        ) : profile ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {profile.pictureUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.pictureUrl} alt="" width={44} height={44} style={{ borderRadius: "50%" }} />
-            ) : null}
-            <div>
-              <div style={{ fontWeight: 600 }}>{profile.displayName}</div>
-              <div className="muted" style={{ fontSize: 13 }}>Signed in with LINE{inClient ? " (inside LINE)" : ""}</div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
-            <p className="muted" style={{ margin: 0 }}>Not signed in. Open this page inside LINE, or connect your account:</p>
-            <ConnectLineButton />
-          </div>
-        )}
-        {error ? <p style={{ color: "#dc2626", fontSize: 13 }}>LIFF error: {error}</p> : null}
-      </section>
+      <div style={{ ...watermarkStyle, top: "38%", right: "5%" }}>
+        {memberCode} · {member.fingerprint}
+      </div>
 
-      <section className="card" style={{ marginTop: 16 }}>
-        <h2 style={{ marginTop: 0, fontSize: 18 }}>What this demonstrates</h2>
-        <ul style={{ paddingLeft: 18, margin: 0 }}>
-          <li><strong>LINE Login (LIFF)</strong> → verify the access token → httpOnly session cookie (<code>/api/line/link</code>)</li>
-          <li><strong>Signed webhook</strong> → <code>X-Line-Signature</code> verification → command bot + RSVP (<code>/api/webhooks/line</code>)</li>
-          <li><strong>Outbound push</strong> + Flex messages (<code>/api/push</code>, <code>lib/line/flex.ts</code>)</li>
-          <li><strong>Scheduled reminders</strong> with advance/due/overdue escalation (<code>/api/cron/reminders</code>)</li>
-          <li><strong>RSVP round-trip</strong> — push an invite, users tap, postbacks are stored (<code>/subscribe</code> + admin events)</li>
-        </ul>
-        <p className="muted" style={{ marginBottom: 0, marginTop: 12, fontSize: 13 }}>
-          See <code>README.md</code> and <code>docs/LINE_SETUP.md</code> to wire it to a real Official Account.
+      <div style={{ ...watermarkStyle, top: "60%", left: "12%" }}>
+        {memberCode} · {member.fingerprint}
+      </div>
+
+      <div style={{ ...watermarkStyle, top: "80%", right: "10%" }}>
+        {memberCode} · {member.fingerprint}
+      </div>
+
+      <div style={{ position: "relative", zIndex: 2 }}>
+        <h1 style={{ marginBottom: 8 }}>Fish Lab 會員專區</h1>
+
+        <p style={{ color: "#666", marginTop: 0 }}>
+          僅供付費會員本人閱讀
         </p>
-      </section>
+
+        <section
+          style={{
+            background: "white",
+            borderRadius: 18,
+            padding: 24,
+            marginTop: 24,
+            boxShadow: "0 4px 18px rgba(0,0,0,0.06)",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 13,
+              color: "#777",
+              marginBottom: 8,
+            }}
+          >
+            會員編號：{memberCode}
+          </div>
+
+          <div
+            style={{
+              fontSize: 13,
+              color: "#777",
+              marginBottom: 20,
+            }}
+          >
+            Fingerprint：{member.fingerprint} · Version {member.version}
+          </div>
+
+          <h2 style={{ marginTop: 0 }}>今日盤勢</h2>
+
+          <p
+            style={{
+              fontSize: 18,
+              lineHeight: 1.8,
+            }}
+          >
+            {member.text}
+          </p>
+
+          <hr
+            style={{
+              border: 0,
+              borderTop: "1px solid #eee",
+              margin: "24px 0",
+            }}
+          />
+
+          <h3>今日觀察重點</h3>
+
+          <p style={{ lineHeight: 1.8 }}>
+            ① 指數是否維持關鍵支撐
+            <br />
+            ② 主流族群量能是否延續
+            <br />
+            ③ 避免追高，等待適合的切入位置
+          </p>
+        </section>
+
+        <div
+          style={{
+            marginTop: 20,
+            fontSize: 12,
+            color: "#999",
+            textAlign: "center",
+          }}
+        >
+          {memberCode} · 僅供本人閱讀 · 禁止轉載
+        </div>
+      </div>
     </main>
   );
 }
