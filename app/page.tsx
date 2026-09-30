@@ -21,14 +21,14 @@ async function getMember(memberCode: string): Promise<Member | null> {
     {
       headers: {
         apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
       },
       cache: "no-store",
     }
   );
 
   if (!response.ok) {
-    throw new Error("Failed to load member");
+    const errorText = await response.text();
+    throw new Error(`Failed to load member: ${errorText}`);
   }
 
   const data: Member[] = await response.json();
@@ -180,8 +180,8 @@ export default async function Home({
             會員編號：{member.member_code}
           </div>
 
-          <div style={{ color: "#777", marginBottom: 20 }}>
-            會員：{member.display_name}
+          <div style={{ color: "#777", marginBottom: 8 }}>
+            會員：{member.display_name || "未設定"}
           </div>
 
           <div style={{ color: "#777", marginBottom: 20 }}>
