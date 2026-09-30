@@ -1,54 +1,131 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
-const members = {
-  A001: {
-    name: "Test Member 1",
-    fingerprint: "FP-A001",
-    version: "A",
-    text: "今日盤勢維持震盪偏多，短線留意量能變化。",
-  },
-  A002: {
-    name: "Test Member 2",
-    fingerprint: "FP-A002",
-    version: "B",
-    text: "今日盤勢仍以震盪偏多看待，短線觀察量能變化。",
-  },
-  A003: {
-    name: "Test Member 3",
-    fingerprint: "FP-A003",
-    version: "C",
-    text: "盤勢暫維持震盪偏多，短線重點仍在量能變化。",
-  },
+type Member = {
+  member_code: string;
+  display_name: string | null;
+  status: string | null;
+  expires_at: string | null;
+  fingerprint_seed: string | null;
 };
 
-type MemberCode = keyof typeof members;
+async function getMember(memberCode: string): Promise<Member | null> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export default function Home() {
-  const [memberCode, setMemberCode] = useState<MemberCode>("A001");
+  if (!supabaseUrl || !serviceKey) {
+    throw new Error("Supabase environment variables are missing");
+  }
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const member = params.get("member");
-
-    if (member && member in members) {
-      setMemberCode(member as MemberCode);
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/members?member_code=eq.${encodeURIComponent(
+      memberCode
+    )}&select=member_code,display_name,status,expires_at,fingerprint_seed&limit=1`,
+    {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      cache: "no-store",
     }
-  }, []);
+  );
 
-  const member = members[memberCode];
+  if (!response.ok) {
+    throw new Error("Failed to load member");
+  }
 
-  const watermarkStyle: React.CSSProperties = {
-    position: "fixed",
-    color: "rgba(0,0,0,0.06)",
-    fontSize: 18,
-    fontWeight: 700,
-    transform: "rotate(-25deg)",
-    pointerEvents: "none",
-    userSelect: "none",
-    zIndex: 1,
-  };
+  const data: Member[] = await response.json();
+
+  return data[0] ?? null;
+}
+
+function getFingerprintContent(seed: string) {
+  const versions = [
+    {
+      version: "A",
+      text: "今日盤勢維持震盪偏多，短線留意量能變化。",
+    },
+    {
+      version: "B",
+      text: "今日盤勢仍以震盪偏多看待，短線觀察量能變化。",
+    },
+    {
+      version: "C",
+      text: "盤勢暫維持震盪偏多，短線重點仍在量能變化。",
+    },
+  ];
+
+  let hash = 0;
+
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash + seed.charCodeAt(i)) % versions.length;
+  }
+
+  return versions[hash];
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ member?: string }>;
+}) {
+  const params = await searchParams;
+
+  const memberCode = params.member?.toUpperCase() || "A001";
+
+  const member = await getMember(memberCode);
+
+  if (!member) {
+    return (
+      <main
+        style={{
+          padding: 40,
+          maxWidth: 720,
+          margin: "0 auto",
+          fontFamily: "sans-serif",
+        }}
+      >
+        <h1>Fish Lab 會員專區</h1>
+        <p>找不到此會員。</p>
+      </main>
+    );
+  }
+
+  if (member.status !== "active") {
+    return (
+      <main
+        style={{
+          padding: 40,
+          maxWidth: 720,
+          margin: "0 auto",
+          fontFamily: "sans-serif",
+        }}
+      >
+        <h1>Fish Lab 會員專區</h1>
+        <p>此會員目前無閱讀權限。</p>
+      </main>
+    );
+  }
+
+  if (member.expires_at && new Date(member.expires_at) < new Date()) {
+    return (
+      <main
+        style={{
+          padding: 40,
+          maxWidth: 720,
+          margin: "0 auto",
+          fontFamily: "sans-serif",
+        }}
+      >
+        <h1>Fish Lab 會員專區</h1>
+        <p>會員資格已到期。</p>
+      </main>
+    );
+  }
+
+  const fingerprint =
+    member.fingerprint_seed || `FP-${member.member_code}`;
+
+  const content = getFingerprintContent(fingerprint);
+
+  const watermark = `${member.member_code} · ${fingerprint}`;
 
   return (
     <main
@@ -56,27 +133,32 @@ export default function Home() {
         maxWidth: 720,
         margin: "0 auto",
         padding: "32px 20px 80px",
-        position: "relative",
         minHeight: "100vh",
         background: "#f7f7f7",
+        position: "relative",
+        overflow: "hidden",
+        fontFamily: "sans-serif",
       }}
     >
-      {/* 浮水印 */}
-      <div style={{ ...watermarkStyle, top: "18%", left: "8%" }}>
-        {memberCode} · {member.fingerprint}
-      </div>
-
-      <div style={{ ...watermarkStyle, top: "38%", right: "5%" }}>
-        {memberCode} · {member.fingerprint}
-      </div>
-
-      <div style={{ ...watermarkStyle, top: "60%", left: "12%" }}>
-        {memberCode} · {member.fingerprint}
-      </div>
-
-      <div style={{ ...watermarkStyle, top: "80%", right: "10%" }}>
-        {memberCode} · {member.fingerprint}
-      </div>
+      {[18, 38, 58, 78].map((top, index) => (
+        <div
+          key={top}
+          style={{
+            position: "fixed",
+            top: `${top}%`,
+            left: index % 2 === 0 ? "8%" : "48%",
+            color: "rgba(0,0,0,0.06)",
+            fontSize: 18,
+            fontWeight: 700,
+            transform: "rotate(-25deg)",
+            pointerEvents: "none",
+            userSelect: "none",
+            zIndex: 1,
+          }}
+        >
+          {watermark}
+        </div>
+      ))}
 
       <div style={{ position: "relative", zIndex: 2 }}>
         <h1 style={{ marginBottom: 8 }}>Fish Lab 會員專區</h1>
@@ -94,35 +176,22 @@ export default function Home() {
             boxShadow: "0 4px 18px rgba(0,0,0,0.06)",
           }}
         >
-          <div
-            style={{
-              fontSize: 13,
-              color: "#777",
-              marginBottom: 8,
-            }}
-          >
-            會員編號：{memberCode}
+          <div style={{ color: "#777", marginBottom: 8 }}>
+            會員編號：{member.member_code}
           </div>
 
-          <div
-            style={{
-              fontSize: 13,
-              color: "#777",
-              marginBottom: 20,
-            }}
-          >
-            Fingerprint：{member.fingerprint} · Version {member.version}
+          <div style={{ color: "#777", marginBottom: 20 }}>
+            會員：{member.display_name}
           </div>
 
-          <h2 style={{ marginTop: 0 }}>今日盤勢</h2>
+          <div style={{ color: "#777", marginBottom: 20 }}>
+            Fingerprint：{fingerprint} · Version {content.version}
+          </div>
 
-          <p
-            style={{
-              fontSize: 18,
-              lineHeight: 1.8,
-            }}
-          >
-            {member.text}
+          <h2>今日盤勢</h2>
+
+          <p style={{ fontSize: 18, lineHeight: 1.8 }}>
+            {content.text}
           </p>
 
           <hr
@@ -147,12 +216,12 @@ export default function Home() {
         <div
           style={{
             marginTop: 20,
-            fontSize: 12,
             color: "#999",
             textAlign: "center",
+            fontSize: 12,
           }}
         >
-          {memberCode} · 僅供本人閱讀 · 禁止轉載
+          {member.member_code} · 僅供本人閱讀 · 禁止轉載
         </div>
       </div>
     </main>
