@@ -6,13 +6,27 @@ type Member = {
   fingerprint_seed: string | null;
 };
 
-async function getMember(memberCode: string): Promise<Member | null> {
+type DailyContent = {
+  id: number;
+  publish_date: string;
+  title: string | null;
+  content: string | null;
+  status: string | null;
+};
+
+function getSupabaseConfig() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceKey) {
     throw new Error("Supabase environment variables are missing");
   }
+
+  return { supabaseUrl, serviceKey };
+}
+
+async function getMember(memberCode: string): Promise<Member | null> {
+  const { supabaseUrl, serviceKey } = getSupabaseConfig();
 
   const response = await fetch(
     `${supabaseUrl}/rest/v1/members?member_code=eq.${encodeURIComponent(
@@ -36,26 +50,54 @@ async function getMember(memberCode: string): Promise<Member | null> {
   return data[0] ?? null;
 }
 
-function getFingerprintContent(seed: string) {
-  const versions = [
+function getTaiwanDate() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  return `${year}-${month}-${day}`;
+}
+
+async function getDailyContent(): Promise<DailyContent | null> {
+  const { supabaseUrl, serviceKey } = getSupabaseConfig();
+
+  const today = getTaiwanDate();
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/daily_contents?publish_date=eq.${today}&status=eq.published&select=id,publish_date,title,content,status&limit=1`,
     {
-      version: "A",
-      text: "今日盤勢維持震盪偏多，短線留意量能變化。",
-    },
-    {
-      version: "B",
-      text: "今日盤勢仍以震盪偏多看待，短線觀察量能變化。",
-    },
-    {
-      version: "C",
-      text: "盤勢暫維持震盪偏多，短線重點仍在量能變化。",
-    },
-  ];
+      headers: {
+        apikey: serviceKey,
+      },
+      cache: "no-store",
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to load daily content: ${errorText}`);
+  }
+
+  const data: DailyContent[] = await response.json();
+
+  return data[0] ?? null;
+}
+
+function getFingerprintVersion(seed: string, contentId: number) {
+  const versions = ["A", "B", "C"];
+  const source = `${seed}-${contentId}`;
 
   let hash = 0;
 
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash + seed.charCodeAt(i)) % versions.length;
+  for (let i = 0; i < source.length; i++) {
+    hash = (hash + source.charCodeAt(i)) % versions.length;
   }
 
   return versions[hash];
@@ -120,10 +162,14 @@ export default async function Home({
     );
   }
 
+  const dailyContent = await getDailyContent();
+
   const fingerprint =
     member.fingerprint_seed || `FP-${member.member_code}`;
 
-  const content = getFingerprintContent(fingerprint);
+  const version = dailyContent
+    ? getFingerprintVersion(fingerprint, dailyContent.id)
+    : "-";
 
   const watermark = `${member.member_code} · ${fingerprint}`;
 
@@ -185,32 +231,42 @@ export default async function Home({
           </div>
 
           <div style={{ color: "#777", marginBottom: 20 }}>
-            Fingerprint：{fingerprint} · Version {content.version}
+            Fingerprint：{fingerprint} · Version {version}
           </div>
 
-          <h2>今日盤勢</h2>
+          {dailyContent ? (
+            <>
+              <h2>{dailyContent.title || "今日盤勢"}</h2>
 
-          <p style={{ fontSize: 18, lineHeight: 1.8 }}>
-            {content.text}
-          </p>
+              <p
+                style={{
+                  fontSize: 18,
+                  lineHeight: 1.8,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {dailyContent.content}
+              </p>
 
-          <hr
-            style={{
-              border: 0,
-              borderTop: "1px solid #eee",
-              margin: "24px 0",
-            }}
-          />
+              <div
+                style={{
+                  marginTop: 24,
+                  color: "#999",
+                  fontSize: 13,
+                }}
+              >
+                發布日期：{dailyContent.publish_date}
+              </div>
+            </>
+          ) : (
+            <>
+              <h2>今日盤勢</h2>
 
-          <h3>今日觀察重點</h3>
-
-          <p style={{ lineHeight: 1.8 }}>
-            ① 指數是否維持關鍵支撐
-            <br />
-            ② 主流族群量能是否延續
-            <br />
-            ③ 避免追高，等待適合的切入位置
-          </p>
+              <p style={{ fontSize: 18, lineHeight: 1.8 }}>
+                今日內容尚未發布。
+              </p>
+            </>
+          )}
         </section>
 
         <div
